@@ -21,7 +21,27 @@ extension Sequence where Element == InlineNode {
 }
 
 private struct TextInlineRenderer {
-  var result = Text("")
+  var result: Text {
+    var result = Text("")
+    for component in resultComponents {
+      switch component {
+      case .attributedString(let attributedString):
+        result = result + Text(attributedString)
+
+      case .image(let image):
+        result = result + Text(image)
+      }
+    }
+
+    return result
+  }
+
+  private enum ResultComponent {
+    case attributedString(AttributedString)
+    case image(Image)
+  }
+
+  private var resultComponents: [ResultComponent] = []
 
   private let baseURL: URL?
   private let textStyles: InlineTextStyles
@@ -102,20 +122,24 @@ private struct TextInlineRenderer {
 
   private mutating func renderImage(_ source: String) {
     if let image = self.images[source] {
-      self.result = self.result + Text(image)
+      self.resultComponents.append(.image(image))
     }
   }
 
   private mutating func defaultRender(_ inline: InlineNode) {
-    self.result =
-      self.result
-      + Text(
-        inline.renderAttributedString(
-          baseURL: self.baseURL,
-          textStyles: self.textStyles,
-          softBreakMode: self.softBreakMode,
-          attributes: self.attributes
-        )
-      )
+    let renderedInline = inline.renderAttributedString(
+      baseURL: self.baseURL,
+      textStyles: self.textStyles,
+      softBreakMode: self.softBreakMode,
+      attributes: self.attributes
+    )
+
+    if case let .attributedString(attributedString) = self.resultComponents.last {
+      let newAttributedString = attributedString + renderedInline
+      self.resultComponents.removeLast()
+      self.resultComponents.append(.attributedString(newAttributedString))
+    } else {
+      self.resultComponents.append(.attributedString(renderedInline))
+    }
   }
 }

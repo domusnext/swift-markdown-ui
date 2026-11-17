@@ -22,29 +22,30 @@ extension Sequence where Element == InlineNode {
 
 private struct TextInlineRenderer {
   var textChunks: [Text] {
-    if self.resultComponents.count == 1,
-      case .attributedString(let text)? = self.resultComponents.first,
-      text.characters.prefix(8_193).count > 8_192
-    {
-      // 保留属性并分段绘制，避免超高的单个 SwiftUI Text 显示为空白。
-      return text.displayChunks(maxCharacters: 512).map { Text($0) }
-    }
-    return [self.result]
-  }
-
-  private var result: Text {
-    var result = Text("")
+    var chunks: [Text] = []
+    var current = Text("")
+    let splitThreshold = 8_192
     for component in resultComponents {
       switch component {
+      case .attributedString(let text) where text.characters.prefix(splitThreshold + 1).count > splitThreshold:
+        // 保留属性并分段绘制，避免超高的单个 SwiftUI Text 显示为空白。
+        let segments = text.displayChunks(maxCharacters: 512)
+        for segment in segments.dropLast() {
+          chunks.append(current + Text(segment))
+          current = Text("")
+        }
+        // 最后一段继续拼接后续行内图片和文字。
+        current = current + Text(segments[segments.count - 1])
+
       case .attributedString(let attributedString):
-        result = result + Text(attributedString)
+        current = current + Text(attributedString)
 
       case .image(let image):
-        result = result + Text(image)
+        current = current + Text(image)
       }
     }
-
-    return result
+    chunks.append(current)
+    return chunks
   }
 
   private enum ResultComponent {

@@ -22,13 +22,13 @@ extension Sequence where Element == InlineNode {
 
 private struct TextInlineRenderer {
   var textChunks: [Text] {
+    let chunkSize = 512
     let totalLength = resultComponents.reduce(0) { $0 + $1.length }
-    guard totalLength > 8_192 else {
+    guard totalLength > 8_192 || resultComponents.count > chunkSize else {
       return [resultComponents.reduce(Text("")) { $0 + $1.text }]
     }
 
     // 对整个段落维持分段预算，避免图片加载后把同段文本重新拼成超高的 Text。
-    let chunkSize = 512
     var chunks: [Text] = []
     var current = Text("")
     var currentLength = 0

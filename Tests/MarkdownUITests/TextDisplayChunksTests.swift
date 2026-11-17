@@ -40,6 +40,13 @@ final class TextDisplayChunksTests: XCTestCase {
     XCTAssertEqual(render([.text("before"), image, .text("after")]).count, 1)
   }
 
+  func testChunkingBoundsDenseSequencesOfInlineImages() {
+    let inlinePair: [InlineNode] = [.text("x"), .image(source: "example", children: [])]
+    let nodes = Array(repeating: inlinePair, count: 3_500).flatMap { $0 }
+
+    XCTAssertGreaterThan(render(nodes).count, 1)
+  }
+
   private func render(_ nodes: [InlineNode]) -> [Text] {
     let theme = Theme.basic
     return nodes.renderTextChunks(

@@ -22,26 +22,35 @@ extension Sequence where Element == InlineNode {
 
 private struct TextInlineRenderer {
   var textChunks: [Text] {
+    let totalLength = resultComponents.reduce(0) { $0 + $1.length }
+    guard totalLength > 8_192 else {
+      return [resultComponents.reduce(Text("")) { $0 + $1.text }]
+    }
+
+    // 对整个段落维持分段预算，避免图片加载后把同段文本重新拼成超高的 Text。
+    let chunkSize = 512
     var chunks: [Text] = []
     var current = Text("")
-    let splitThreshold = 8_192
+    var currentLength = 0
+
+    func append(_ part: Text, length: Int) {
+      if currentLength + length > chunkSize {
+        chunks.append(current)
+        current = Text("")
+        currentLength = 0
+      }
+      current = current + part
+      currentLength += length
+    }
+
     for component in resultComponents {
       switch component {
-      case .attributedString(let text) where text.characters.prefix(splitThreshold + 1).count > splitThreshold:
-        // 保留属性并分段绘制，避免超高的单个 SwiftUI Text 显示为空白。
-        let segments = text.displayChunks(maxCharacters: 512)
-        for segment in segments.dropLast() {
-          chunks.append(current + Text(segment))
-          current = Text("")
+      case .attributedString(let text):
+        for segment in text.displayChunks(maxCharacters: chunkSize) {
+          append(Text(segment), length: segment.characters.count)
         }
-        // 最后一段继续拼接后续行内图片和文字。
-        current = current + Text(segments[segments.count - 1])
-
-      case .attributedString(let attributedString):
-        current = current + Text(attributedString)
-
       case .image(let image):
-        current = current + Text(image)
+        append(Text(image), length: 1)
       }
     }
     chunks.append(current)
@@ -51,6 +60,20 @@ private struct TextInlineRenderer {
   private enum ResultComponent {
     case attributedString(AttributedString)
     case image(Image)
+
+    var length: Int {
+      switch self {
+      case .attributedString(let text): return text.characters.count
+      case .image: return 1
+      }
+    }
+
+    var text: Text {
+      switch self {
+      case .attributedString(let text): return Text(text)
+      case .image(let image): return Text(image)
+      }
+    }
   }
 
   private var resultComponents: [ResultComponent] = []

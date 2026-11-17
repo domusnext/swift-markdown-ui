@@ -26,13 +26,23 @@ final class TextDisplayChunksTests: XCTestCase {
   }
 
   func testLoadedInlineImageDoesNotDisableLongTextChunking() {
+    let longText = String(repeating: "word ", count: 2_000)
+    let chunks = render([.text(longText), .image(source: "example", children: []), .text("after")])
+
+    XCTAssertGreaterThan(chunks.count, 1)
+  }
+
+  func testChunkingUsesTotalLengthAcrossInlineImages() {
+    let text = String(repeating: "word ", count: 1_000)
+    let image = InlineNode.image(source: "example", children: [])
+
+    XCTAssertGreaterThan(render([.text(text), image, .text(text)]).count, 1)
+    XCTAssertEqual(render([.text("before"), image, .text("after")]).count, 1)
+  }
+
+  private func render(_ nodes: [InlineNode]) -> [Text] {
     let theme = Theme.basic
-    let nodes: [InlineNode] = [
-      .text(String(repeating: "word ", count: 2_000)),
-      .image(source: "example", children: []),
-      .text("after the image"),
-    ]
-    let chunks = nodes.renderTextChunks(
+    return nodes.renderTextChunks(
       baseURL: nil,
       textStyles: .init(
         code: theme.code, emphasis: theme.emphasis, strong: theme.strong,
@@ -43,6 +53,5 @@ final class TextDisplayChunksTests: XCTestCase {
       attributes: .init()
     )
 
-    XCTAssertGreaterThan(chunks.count, 1)
   }
 }

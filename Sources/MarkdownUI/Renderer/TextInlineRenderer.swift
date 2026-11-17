@@ -1,13 +1,13 @@
 import SwiftUI
 
 extension Sequence where Element == InlineNode {
-  func renderText(
+  func renderTextChunks(
     baseURL: URL?,
     textStyles: InlineTextStyles,
     images: [String: Image],
     softBreakMode: SoftBreak.Mode,
     attributes: AttributeContainer
-  ) -> Text {
+  ) -> [Text] {
     var renderer = TextInlineRenderer(
       baseURL: baseURL,
       textStyles: textStyles,
@@ -16,12 +16,23 @@ extension Sequence where Element == InlineNode {
       attributes: attributes
     )
     renderer.render(self)
-    return renderer.result
+    return renderer.textChunks
   }
 }
 
 private struct TextInlineRenderer {
-  var result: Text {
+  var textChunks: [Text] {
+    if self.resultComponents.count == 1,
+      case .attributedString(let text)? = self.resultComponents.first,
+      text.characters.prefix(8_193).count > 8_192
+    {
+      // 保留属性并分段绘制，避免超高的单个 SwiftUI Text 显示为空白。
+      return text.displayChunks(maxCharacters: 512).map { Text($0) }
+    }
+    return [self.result]
+  }
+
+  private var result: Text {
     var result = Text("")
     for component in resultComponents {
       switch component {

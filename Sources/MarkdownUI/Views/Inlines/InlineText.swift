@@ -17,7 +17,7 @@ struct InlineText: View {
 
   var body: some View {
     TextStyleAttributesReader { attributes in
-      self.inlines.renderText(
+      let chunks = self.inlines.renderTextChunks(
         baseURL: self.baseURL,
         textStyles: .init(
           code: self.theme.code,
@@ -30,6 +30,15 @@ struct InlineText: View {
         softBreakMode: self.softBreakMode,
         attributes: attributes
       )
+      if chunks.count == 1 {
+        chunks[0]
+      } else {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(chunks.indices, id: \.self) { index in
+            chunks[index]
+          }
+        }
+      }
     }
     .task(id: self.inlines) {
       self.inlineImages = (try? await self.loadInlineImages()) ?? [:]
